@@ -27,26 +27,40 @@ A backend banking ledger POC built with **C#, ASP.NET Core Web API, and MongoDB*
 
 ```text
 BankingLedgerApi/
+│
 ├── Controllers/
 │   ├── CustomersController.cs
 │   ├── AccountsController.cs
 │   └── TransactionsController.cs
+│
 ├── Data/
 │   └── MongoDbContext.cs
+│
 ├── DTOs/
 │   ├── CreateCustomerDto.cs
 │   ├── CreateAccountDto.cs
 │   └── MoneyTransactionDto.cs
+│
 ├── Models/
 │   ├── Customer.cs
 │   ├── BankAccount.cs
 │   └── LedgerTransaction.cs
+│
+├── Repositories/
+│   ├── ICustomerRepository.cs
+│   ├── CustomerRepository.cs
+│   ├── IAccountRepository.cs
+│   ├── AccountRepository.cs
+│   ├── ITransactionRepository.cs
+│   └── TransactionRepository.cs
+│
 ├── Services/
 │   ├── CustomerService.cs
 │   ├── AccountService.cs
 │   └── TransactionService.cs
-├── appsettings.json
+│
 ├── Program.cs
+├── appsettings.json
 └── BankingLedgerApi.csproj
 ```
 
