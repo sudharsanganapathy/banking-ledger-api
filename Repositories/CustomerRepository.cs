@@ -27,8 +27,23 @@ public class CustomerRepository : ICustomerRepository
             .FirstOrDefaultAsync();
     }
 
+    
+    public async Task<Customer?> GetByAppUserIdAsync(string appUserId)
+    {
+        return await _context.Customers
+            .Find(customer => customer.AppUserId == appUserId)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task CreateAsync(Customer customer)
     {
         await _context.Customers.InsertOneAsync(customer);
     }
+
+    public async Task UpdateAsync(Customer customer)
+    {
+        await _context.Customers.ReplaceOneAsync(
+            existingCustomer => existingCustomer.Id == customer.Id, customer);
+    }
+
 }

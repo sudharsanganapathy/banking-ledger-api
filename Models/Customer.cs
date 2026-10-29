@@ -9,6 +9,10 @@ public class Customer
     [BsonRepresentation(BsonType.ObjectId)]
     public string? Id { get; set; }
 
+    [BsonElement("appUserId")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? AppUserId { get; set; }
+
     [BsonElement("fullName")]
     public string FullName { get; set; } = string.Empty;
 

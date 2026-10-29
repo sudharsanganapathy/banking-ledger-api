@@ -14,6 +14,8 @@ public class MongoDbContext
 
     public IMongoCollection<LedgerTransaction> Transactions { get; }
 
+    public IMongoCollection<AppUser> Users { get; }
+
     public MongoDbContext(IConfiguration configuration)
     {
         string connectionString =
@@ -35,5 +37,22 @@ public class MongoDbContext
         Accounts = _database.GetCollection<BankAccount>("accounts");
 
         Transactions = _database.GetCollection<LedgerTransaction>("transactions");
+
+        Users = _database.GetCollection<AppUser>("users");
     }
+
+    public async Task CreateIndexesAsync()
+    {
+        var emailIndex = new CreateIndexModel<AppUser>(
+            Builders<AppUser>.IndexKeys
+                .Ascending(user => user.Email),
+            new CreateIndexOptions
+            {
+                Unique = true,
+                Name = "unique_user_email"
+            });
+
+        await Users.Indexes.CreateOneAsync(emailIndex);
+    }
+
 }

@@ -2,11 +2,14 @@ using BankingLedgerApi.DTOs;
 using BankingLedgerApi.Services;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace BankingLedgerApi.Controllers;
 
 [ApiController]
 [Route("api/customers")]
+[Authorize]
 public class CustomersController : ControllerBase
 {
     private readonly CustomerService _customerService;
@@ -45,14 +48,22 @@ public class CustomersController : ControllerBase
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetCustomerById(string id)
+{
+    var customer = await _customerService.GetByIdAsync(id);
+
+    if (customer is null)
     {
-        var customer = await _customerService.GetByIdAsync(id);
-
-        if (customer is null)
-        {
-            return NotFound(new { message = "Customer not found." });
-        }
-
-        return Ok(customer);
+        return NotFound(new { message = "Customer not found." });
     }
+
+    var loggedInUserId = User.FindFirstValue(
+        ClaimTypes.NameIdentifier);
+
+    if (customer.AppUserId != loggedInUserId)
+    {
+        return NotFound(new { message = "Customer not found." });
+    }
+
+    return Ok(customer);
+  }
 }

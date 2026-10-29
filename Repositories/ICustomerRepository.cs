@@ -9,5 +9,9 @@ public interface ICustomerRepository
 
     Task<Customer?> GetByIdAsync(string id);
 
+    Task<Customer?> GetByAppUserIdAsync(string appUserId);
+
     Task CreateAsync(Customer customer);
+
+    Task UpdateAsync(Customer customer);
 }
