@@ -1,27 +1,120 @@
-# Banking Ledger Management System
+# BankingLedgerApi
 
-A backend banking ledger POC built with **C#, ASP.NET Core Web API, and MongoDB**. The application manages customers and bank accounts, processes deposits and withdrawals, maintains a transaction ledger, and provides account balance and transaction history APIs.
+### Secure Banking Ledger Management API built with ASP.NET Core and MongoDB
+
+A backend REST API for managing customers, bank accounts, and financial transactions, with JWT-based authentication, password hashing, and customer-level ownership authorization.
+
+Built using **C#, ASP.NET Core Web API, .NET 10, and MongoDB**, this project focuses on clean separation of concerns, secure API access, and maintaining a structured banking ledger.
+
+---
+
+## Overview
+
+BankingLedgerApi is a backend application designed around common banking operations, including customer management, account management, deposits, withdrawals, and transaction history.
+
+The application uses a layered architecture to separate HTTP handling, business logic, and database access. Authentication is implemented using JWT access tokens, while customer ownership checks prevent authenticated users from accessing other customers' records through the protected customer-by-ID endpoint.
+
+### Key Features
+
+- **Customer Management** — Create and retrieve customer records.
+- **Bank Account Management** — Manage bank accounts and retrieve account information and balances.
+- **Ledger Transactions** — Support deposits, withdrawals, and transaction history.
+- **JWT Authentication** — Register users, authenticate credentials, and issue access tokens.
+- **Password Hashing** — Hash passwords using ASP.NET Core Identity's `PasswordHasher<T>`.
+- **Customer Ownership Authorization** — Verify ownership before returning a customer record by ID.
+- **User–Customer Linking** — Associate registered users and customer records through MongoDB ObjectIds.
+- **MongoDB Integration** — Persist application data in MongoDB collections.
+- **Repository Pattern** — Separate database operations from business logic.
+- **Input Validation** — Use data annotations on registration and login DTOs.
+- **Unique Email Index** — Create a MongoDB unique index for user email addresses.
+- **API Testing** — Validate authentication and authorization behavior using Postman.
+
+---
 
 ## Tech Stack
 
-- **Language:** C#
-- **Framework:** ASP.NET Core Web API (.NET 10)
-- **Database:** MongoDB
-- **Database Driver:** MongoDB.Driver
-- **API Testing:** Postman
-- **Architecture:** Controllers → Services → MongoDB Context → MongoDB
+| Technology | Purpose |
+|---|---|
+| C# | Backend programming language |
+| .NET 10 | Application runtime and SDK target |
+| ASP.NET Core Web API | REST API framework |
+| MongoDB | NoSQL database |
+| MongoDB.Driver | MongoDB data access |
+| JWT Bearer Authentication | Token-based API authentication |
+| ASP.NET Core Identity | Password hashing and verification |
+| Data Annotations | Request validation |
+| Swagger / OpenAPI | API exploration and documentation |
+| Postman | API testing |
+| Git and GitHub | Version control |
 
-## Features
+---
 
-- Create and retrieve customers.
-- Validate customer details and check for duplicate email addresses.
-- Create bank accounts linked to existing customers.
-- Retrieve account details and balances.
-- Deposit money and withdraw money.
-- Prevent withdrawals exceeding the available balance.
-- Record transaction references, amounts, transaction types, and before/after balances.
-- Retrieve account transaction history in descending chronological order.
-- Handle invalid inputs, missing resources, and insufficient balances.
+## Architecture
+
+The application follows a layered architecture that separates responsibilities and makes the code easier to maintain and extend.
+
+```mermaid
+flowchart TD
+    Client["Client / Postman"]
+    Controller["Controllers"]
+    Auth["JWT Authentication"]
+    Service["Services"]
+    Repo["Repositories"]
+    Context["MongoDbContext"]
+    DB[("MongoDB")]
+
+    Client --> Auth
+    Auth --> Controller
+    Controller --> Service
+    Service --> Repo
+    Repo --> Context
+    Context --> DB
+
+    classDef client fill:#e5e7eb,stroke:#64748b,color:#111827
+    classDef security fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef layer fill:#f3f4f6,stroke:#6b7280,color:#111827
+    classDef database fill:#dcfce7,stroke:#16a34a,color:#14532d
+
+    class Client client
+    class Auth security
+    class Controller,Service,Repo,Context layer
+    class DB database
+```
+
+### Layer Responsibilities
+
+**Controllers**
+- Handle incoming HTTP requests and responses.
+- Receive validated request data through DTOs.
+- Call the appropriate service methods.
+- Return suitable HTTP status codes.
+
+**Services**
+- Contain application and business logic.
+- Coordinate authentication, customer management, and banking operations.
+- Apply validation and business rules where implemented.
+
+**Repositories**
+- Encapsulate MongoDB data access.
+- Retrieve, create, and update application documents.
+- Keep database operations separate from service logic.
+
+**Data**
+- Provides the MongoDB context.
+- Exposes the application's collections.
+- Configures database indexes.
+
+**Models**
+- Define MongoDB document structures.
+- Map C# properties to MongoDB fields using BSON attributes.
+- Represent users, customers, bank accounts, and ledger transactions.
+
+**DTOs**
+- Define request data accepted by API endpoints.
+- Apply validation rules to incoming registration and login data.
+- Avoid using database document models directly as request contracts where DTOs are defined.
+
+---
 
 ## Project Structure
 
@@ -29,6 +122,7 @@ A backend banking ledger POC built with **C#, ASP.NET Core Web API, and MongoDB*
 BankingLedgerApi/
 │
 ├── Controllers/
+│   ├── AuthController.cs
 │   ├── CustomersController.cs
 │   ├── AccountsController.cs
 │   └── TransactionsController.cs
@@ -37,16 +131,21 @@ BankingLedgerApi/
 │   └── MongoDbContext.cs
 │
 ├── DTOs/
+│   ├── RegisterDto.cs
+│   ├── LoginDto.cs
 │   ├── CreateCustomerDto.cs
 │   ├── CreateAccountDto.cs
 │   └── MoneyTransactionDto.cs
 │
 ├── Models/
+│   ├── AppUser.cs
 │   ├── Customer.cs
 │   ├── BankAccount.cs
 │   └── LedgerTransaction.cs
 │
 ├── Repositories/
+│   ├── IUserRepository.cs
+│   ├── UserRepository.cs
 │   ├── ICustomerRepository.cs
 │   ├── CustomerRepository.cs
 │   ├── IAccountRepository.cs
@@ -55,250 +154,275 @@ BankingLedgerApi/
 │   └── TransactionRepository.cs
 │
 ├── Services/
+│   ├── AuthService.cs
 │   ├── CustomerService.cs
 │   ├── AccountService.cs
 │   └── TransactionService.cs
 │
+├── Properties/
 ├── Program.cs
 ├── appsettings.json
-└── BankingLedgerApi.csproj
+├── BankingLedgerApi.csproj
+├── .gitignore
+└── README.md
 ```
+
+*The structure above reflects the intended organization of the existing project. Keep any additional files already present in your repository.*
+
+---
+
+## Authentication and Authorization
+
+### JWT Authentication
+
+The authentication workflow supports user registration and login.
+
+1. A user submits registration details.
+2. The API checks whether the email is already registered.
+3. The password is hashed before the user is stored.
+4. The user is associated with an existing customer record by email, if available and unlinked, or a new customer record is created.
+5. During login, the submitted password is verified against the stored hash.
+6. A successful login returns a signed JWT access token.
+
+The token contains identity claims, including the user ID, name, email, and role.
+
+### User–Customer Relationship
+
+The application maintains a relationship between the registered user and their customer record.
+
+```text
+AppUser
+  ├── Id
+  └── CustomerId ───────────────┐
+                                │
+                                ▼
+Customer                        _id
+  ├── AppUserId ────────────────┘
+  ├── FullName
+  ├── Email
+  └── PhoneNumber
+```
+
+The IDs are stored as MongoDB ObjectIds and represented as strings in the corresponding C# models.
+
+### Customer Ownership Authorization
+
+The customer-by-ID endpoint checks the authenticated user's ID against the customer's `AppUserId`.
+
+- The owner can retrieve their customer record.
+- A different authenticated user receives `404 Not Found`.
+- A request without a valid bearer token receives `401 Unauthorized`.
+
+**Authorization scope:** This ownership check is implemented for the customer-by-ID endpoint. Equivalent ownership checks for all account and transaction operations, role-specific authorization policies, and production-grade registration rollback are further hardening tasks.
+
+---
+
+## API Overview
+
+The application exposes the following API areas. Use Swagger or the controller implementations to verify the exact HTTP methods, routes, and request schemas.
+
+| API area | Purpose |
+|---|---|
+| Authentication | Registration, login, and current-user information |
+| Customers | Customer creation and customer retrieval |
+| Accounts | Account creation, account details, and balance retrieval |
+| Transactions | Deposits, withdrawals, and ledger history |
+
+### Authentication Endpoints
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/auth/register` | Register a user and associate a customer record |
+| POST | `/api/auth/login` | Authenticate credentials and obtain a JWT |
+| GET | `/api/auth/me` | Retrieve identity information from the authenticated token |
+
+### Using a Protected Endpoint
+
+For authenticated endpoints:
+
+1. Register or log in to obtain a JWT.
+2. Open the protected request in Postman.
+3. Select **Authorization → Bearer Token**.
+4. Paste the access token.
+5. Send the request.
+
+Include the token in the `Authorization` header:
+
+```http
+Authorization: Bearer YOUR_ACCESS_TOKEN
+```
+
+Do not commit real tokens or credentials to source control.
+
+---
+
+## Database Design
+
+Database: `BankingLedgerDb`
+
+MongoDB collections include:
+
+| Collection | Responsibility |
+|---|---|
+| `users` | Login identity, password hash, role, and customer reference |
+| `customers` | Customer profile and linked user reference |
+| `accounts` | Account number, customer reference, balance, currency, and status |
+| `transactions` | Financial transaction and ledger information |
+
+### Important Relationships
+
+- A user references their customer through `customerId`.
+- A customer references their linked user through `appUserId`.
+- A bank account references its customer through `customerId`.
+- Transactions record banking activity according to the transaction model.
+
+MongoDB BSON attributes are used to control stored field names and ObjectId representation.
+
+### Indexing
+
+A unique index named `unique_user_email` is created on the user email field to prevent duplicate user email values at the database level.
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- .NET 10 SDK
-- MongoDB running locally or an accessible MongoDB deployment
-- Postman
+Install the following:
 
-### Configuration
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [MongoDB Community Server](https://www.mongodb.com/try/download/community)
+- [MongoDB Compass](https://www.mongodb.com/try/download/compass) (optional)
+- [Postman](https://www.postman.com/downloads/)
+- Git
 
-Configure `appsettings.json`:
+### 1. Clone the Repository
 
-```json
-{
-  "MongoDbSettings": {
-    "ConnectionString": "mongodb://127.0.0.1:27017",
-    "DatabaseName": "BankingLedgerDb"
-  }
-}
+```bash
+git clone YOUR_GITHUB_REPOSITORY_URL
+cd BankingLedgerApi
 ```
 
-The application uses the `BankingLedgerDb` database.
+Replace the repository URL with the actual GitHub repository URL.
 
-### Run the application
+### 2. Start MongoDB
 
-Open a terminal in the project directory:
+For the current local development configuration, MongoDB runs at:
+
+```text
+mongodb://127.0.0.1:27017
+```
+
+The application database is:
+
+```text
+BankingLedgerDb
+```
+
+Ensure the MongoDB service is running before starting the API.
+
+### 3. Configure Application Settings
+
+Review `appsettings.json` and configure the MongoDB connection string and database name using the configuration keys read by `MongoDbContext`.
+
+JWT configuration uses these keys:
+
+```text
+Jwt:Secret
+Jwt:Issuer
+Jwt:Audience
+```
+
+The issuer and audience should match the values expected by the token validation configuration.
+
+**Never store a production JWT signing secret in a committed configuration file.**
+
+For local development, initialize .NET User Secrets if necessary:
+
+```bash
+dotnet user-secrets init
+```
+
+Set a strong secret without committing it to Git:
+
+```bash
+dotnet user-secrets set "Jwt:Secret" "YOUR_STRONG_RANDOM_SECRET"
+```
+
+Set the issuer and audience if they are not already configured:
+
+```bash
+dotnet user-secrets set "Jwt:Issuer" "BankingLedgerApi"
+dotnet user-secrets set "Jwt:Audience" "BankingLedgerApiClient"
+```
+
+Use a securely generated secret appropriate for the configured signing algorithm. Never share the actual secret in a README, GitHub issue, screenshot, or chat.
+
+### 4. Restore Dependencies
 
 ```bash
 dotnet restore
+```
+
+### 5. Build the Project
+
+```bash
 dotnet build
+```
+
+### 6. Run the API
+
+```bash
 dotnet run
 ```
 
-Use the HTTP or HTTPS URL printed in the terminal as the base URL for your Postman requests.
+Use the actual HTTP or HTTPS URL printed by the application in your API client.
 
-For example, if the application reports `http://localhost:5000`, the base URL is:
+### 7. Explore the API
 
-```text
-http://localhost:5000
-```
+If Swagger is enabled for the current environment, open the Swagger UI URL shown by your application or configured in `Program.cs`.
 
-Use your actual printed URL if the port differs.
+You can also import or recreate the requests in Postman.
 
-## API Documentation
+---
 
-Replace `BASE_URL` below with the application's actual base URL.
+## Security Considerations
 
-### 1. Customer Management
+This project incorporates several foundational security measures:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/customers` | Create a customer |
-| GET | `/api/customers/{id}` | Retrieve a customer by MongoDB ID |
+- Passwords are hashed using `PasswordHasher<AppUser>`.
+- JWTs are validated by ASP.NET Core authentication middleware.
+- Protected endpoints use authorization attributes.
+- Customer ownership is checked before returning a customer record by ID.
+- A unique user email index helps enforce uniqueness.
+- Secrets should be provided through User Secrets or environment-specific configuration.
 
-**Create customer — request body**
+Before production use, further work is required around consistent ownership enforcement across all banking endpoints, atomicity or recovery for multi-document operations, rate limiting, audit logging, comprehensive validation, and automated security testing.
 
-```json
-{
-  "fullName": "Arun Kumar",
-  "email": "arun@example.com",
-  "phoneNumber": "9876543210"
-}
-```
+**Financial data integrity matters:** the current local MongoDB deployment is standalone, so multi-document transactions cannot be assumed to be available. Deposits, withdrawals, and transfers must be reviewed for concurrency, balance consistency, and failure recovery before production use.
 
-Validation includes a required full name, a valid email address, and a 10-digit phone number.
+---
 
-Successful creation returns `201 Created`. A duplicate email returns `409 Conflict`.
+## Engineering Principles
 
-### 2. Bank Account Management
+The project is organized around these principles:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/accounts` | Create an account for an existing customer |
-| GET | `/api/accounts/{accountNumber}` | Retrieve account details |
-| GET | `/api/accounts/{accountNumber}/balance` | Retrieve the current balance |
+- **Separation of Concerns** — Controllers, services, repositories, and database context have distinct responsibilities.
+- **Dependency Injection** — Services and repositories are supplied through ASP.NET Core's dependency injection system.
+- **Repository Pattern** — Database access is isolated behind repository contracts.
+- **DTO-Based Requests** — API request models are separated from persistence models where implemented.
+- **Explicit Authentication** — JWT bearer tokens establish the caller's identity.
+- **Resource Ownership Checks** — Protected customer retrieval validates ownership.
+- **Configuration Separation** — Environment-specific secrets should not be committed to the repository.
 
-**Create account — request body**
+---
 
-```json
-{
-  "customerId": "REPLACE_WITH_CUSTOMER_OBJECT_ID"
-}
-```
+## Project Status
 
-A valid existing customer is required. New accounts start with a zero balance, use INR as the currency, and have an initial status of `Active`.
+**Development stage:** Core API and authentication implementation.
 
-The account number is generated by the application.
+Customer, account, and transaction API functionality has been developed, and JWT authentication and customer-level ownership checks have been tested. Full banking authorization coverage and production-grade transaction consistency remain areas for further development.
 
-Successful creation returns `201 Created`.
+---
 
-### 3. Deposits and Withdrawals
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/transactions/deposit` | Deposit money |
-| POST | `/api/transactions/withdraw` | Withdraw money |
-| GET | `/api/transactions/{accountNumber}/history` | Retrieve transaction history |
-
-**Deposit — request body**
-
-```json
-{
-  "accountNumber": "REPLACE_WITH_ACCOUNT_NUMBER",
-  "amount": 1000,
-  "description": "Initial deposit"
-}
-```
-
-**Withdrawal — request body**
-
-```json
-{
-  "accountNumber": "REPLACE_WITH_ACCOUNT_NUMBER",
-  "amount": 300,
-  "description": "Test withdrawal"
-}
-```
-
-The transaction amount must be greater than zero and cannot exceed the configured DTO maximum. The account must exist and have an `Active` status.
-
-Successful transactions return `200 OK` with a ledger entry containing:
-
-- Transaction reference
-- Account number and account ID
-- Transaction type
-- Transaction amount
-- Balance before the transaction
-- Balance after the transaction
-- Description, status, and timestamp
-
-### Example transaction history response
-
-```json
-{
-  "accountNumber": "REPLACE_WITH_ACCOUNT_NUMBER",
-  "totalTransactions": 2,
-  "transactions": [
-    {
-      "transactionReference": "TXNEXAMPLE1234",
-      "accountNumber": "REPLACE_WITH_ACCOUNT_NUMBER",
-      "type": "Withdrawal",
-      "amount": 300,
-      "balanceBefore": 1000,
-      "balanceAfter": 700,
-      "description": "Test withdrawal",
-      "status": "Completed"
-    }
-  ]
-}
-```
-
-This is an illustrative response; actual identifiers, timestamps, and field values depend on the stored records.
-
-## MongoDB Database Design
-
-Database name: `BankingLedgerDb`
-
-### Collection: `customers`
-
-Stores customer information.
-
-| Field | Description |
-|---|---|
-| `_id` | MongoDB ObjectId |
-| `fullName` | Customer's full name |
-| `email` | Normalized email address |
-| `phoneNumber` | Customer's phone number |
-| `createdAt` | UTC creation timestamp |
-
-### Collection: `accounts`
-
-Stores bank account information.
-
-| Field | Description |
-|---|---|
-| `_id` | MongoDB ObjectId |
-| `AccountNumber` | Generated account number |
-| `CustomerId` | Reference to the customer ObjectId |
-| `Balance` | Current balance stored as Decimal128 |
-| `Currency` | Account currency, initially INR |
-| `Status` | Account status |
-| `CreatedAt` | UTC creation timestamp |
-
-### Collection: `transactions`
-
-Stores the ledger records for deposits and withdrawals.
-
-| Field | Description |
-|---|---|
-| `_id` | MongoDB ObjectId |
-| `TransactionReference` | Generated transaction reference |
-| `AccountId` | Reference to the account ObjectId |
-| `AccountNumber` | Account associated with the transaction |
-| `Type` | Deposit or Withdrawal |
-| `Amount` | Transaction amount stored as Decimal128 |
-| `BalanceBefore` | Balance before the transaction |
-| `BalanceAfter` | Balance after the transaction |
-| `Description` | Transaction description |
-| `Status` | Transaction status |
-| `CreatedAt` | UTC transaction timestamp |
-
-**Relationships**
-
-- One customer can have multiple accounts.
-- Each account belongs to a customer.
-- Each account can have multiple ledger transactions.
-- The transaction collection retains the recorded transaction details separately from the account's current balance.
-
-Note: Customer fields use explicit BSON element names in the model. Account and ledger fields currently use the MongoDB driver's default property naming, so their stored field names may be PascalCase.
-
-## HTTP Status Codes
-
-| Status | Meaning |
-|---|---|
-| `200 OK` | Request completed successfully |
-| `201 Created` | Customer or account created successfully |
-| `400 Bad Request` | Invalid input or validation failure |
-| `404 Not Found` | Customer or account does not exist |
-| `409 Conflict` | Duplicate customer email, insufficient balance, or inactive account |
-| `500 Internal Server Error` | Unexpected server-side failure |
-
-## Postman Testing Checklist
-
-1. Create a customer and save the returned customer ID.
-2. Create an account using that customer ID.
-3. Retrieve the account and verify its initial balance is zero.
-4. Deposit ₹1,000.
-5. Withdraw ₹300.
-6. Verify the account balance is ₹700.
-7. Retrieve transaction history and verify both transactions.
-8. Attempt to withdraw more than the available balance and verify that the request fails without reducing the balance.
-9. Test invalid amounts and nonexistent account numbers.
-10. Test duplicate customer email addresses.
-
-
-## Conclusion
-
-The Banking Ledger Management System demonstrates REST API design, data validation, MongoDB integration, account balance management, deposit and withdrawal operations, and transaction history retrieval using C# and ASP.NET Core Web API.
+**Built with C#, ASP.NET Core, and MongoDB.**
